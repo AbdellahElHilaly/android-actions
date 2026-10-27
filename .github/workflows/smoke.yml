@@ -1,9 +1,5 @@
 name: Verify HTML Shelf APK
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/smoke.yml'
   workflow_dispatch:
 permissions:
   contents: read
