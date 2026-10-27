@@ -58,14 +58,18 @@ on:
 permissions:
   contents: read
 
+# Keep one build active; redundant runs are cancelled to conserve resources.
 concurrency:
-  group: apk-factory-${{ github.run_id }}
-  cancel-in-progress: false
+  group: apk-factory-${{ github.ref }}
+  cancel-in-progress: true
 
+# Only build in a public repository to avoid consuming private-repo minutes or billable usage.
+# ubuntu-24.04 is a standard hosted runner, free on public repositories.
 jobs:
   build:
+    if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 35
     steps:
       - name: Checkout factory
         uses: actions/checkout@v4
@@ -87,6 +91,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ inputs.gradle_version }}
+          cache-disabled: true
 
       - name: Stage selected project
         env:
@@ -149,4 +154,4 @@ jobs:
           name: android-debug-apk-${{ github.run_number }}
           path: dist/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
