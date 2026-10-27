@@ -59,3 +59,9 @@ The workflow requests only `contents: read` and does not use a signing secret. T
 - No Releases are published and no GitHub Pages site is enabled.
 - Included sample project `projects/html-shelf` is carried over as provided source; compilation on GitHub needs to complete before the APK is confirmed working.
 - Building Kotlin/Compose/Flutter/React Native projects with custom build requirements may need extra SDK/toolchain steps. This factory is primarily for Android Gradle projects and static websites.
+
+## GitHub Actions runner troubleshooting
+
+If a run is marked **failed** within 2–3 seconds, lists **zero steps**, and shows `runner_id: 0`, the build never reached a GitHub-hosted runner; this is not proof of a Gradle failure. Open the failed run to read the GitHub job-level error. Check **Settings → Billing & licensing → Budgets and alerts**, payment status, and Actions budget restrictions; if those are fine, contact GitHub Support. See [GitHub billing guide](https://docs.github.com/en/billing/how-tos/set-up-budgets).
+
+This repository is public and the standard `ubuntu-24.04` hosted runner is free for public repositories; **you do not need a paid GitHub Actions subscription** to use the factory. The hosted service can still block a job due to account billing or entitlement issues. Until GitHub starts a runner, no APK artifact can be produced by these workflows.
