@@ -36,7 +36,7 @@ You can use the factory itself as the home for multiple apps. Nothing needs to b
 
 Add Android project folders under `projects/`, and HTML folders or ZIP archives under `sites/`. Keep the folder structure of each native project intact. The factory stages each build into a temporary `.factory-work` directory; originals are not modified. ZIP extraction rejects traversal and several unsafe file types and imposes size/count limits.
 
-An optional `tests/run.sh` inside a native project is executed before building. Successful outputs are uploaded by `actions/upload-artifact` and retained for **14 days**. A SHA256 checksum file accompanies each APK.
+An optional `tests/run.sh` inside a native project is executed before building. Successful outputs are uploaded by `actions/upload-artifact` and retained for **1 day**. A SHA256 checksum file accompanies each APK.
 
 A GitHub Actions **debug APK** is signed with an Android debug key, suitable for local installation and testing, not Google Play release. Repeated builds on different runners can use different debug certificates; if Android rejects an update, uninstall the previous app first (back up app data before uninstalling).
 
@@ -59,6 +59,23 @@ The workflow requests only `contents: read` and does not use a signing secret. T
 - No Releases are published and no GitHub Pages site is enabled.
 - Included sample project `projects/html-shelf` is carried over as provided source; compilation on GitHub needs to complete before the APK is confirmed working.
 - Building Kotlin/Compose/Flutter/React Native projects with custom build requirements may need extra SDK/toolchain steps. This factory is primarily for Android Gradle projects and static websites.
+
+## Free-only GitHub Actions policy
+
+This factory intentionally uses only the **standard** GitHub-hosted `ubuntu-24.04` runner in this **public** repository. Standard runners in public repositories do not consume paid Actions minutes. You do not need to purchase larger runners or a GitHub Actions subscription.
+
+The workflow includes these cost-avoidance measures:
+
+- It **skips all build jobs if the repository is private**, so this factory cannot start a billable private-repository build.
+- It runs only by manual `workflow_dispatch` (no cron or build-on-push).
+- It runs a single build at a time and cancels older runs on the same branch.
+- It disables Gradle Actions cache storage.
+- It limits each build to 35 minutes and retains APK artifacts for **1 day** only. Download your APK promptly.
+- It publishes no GitHub Releases or other paid services.
+
+**Storage caution:** Although standard runner time in public repositories is free, GitHub applies plan-specific storage allowances to artifacts and Packages. Storage shared across other repositories is controlled by the GitHub account, not just this workflow. Do not rely on workflow settings as a universal billing lock. To prohibit additional billed usage, configure an **Actions budget of $0 with a hard stop** (when offered) under GitHub **Settings → Billing & licensing → Budgets and alerts**. Check that your personal budget rules and any legacy restrictions still allow your free public builds.
+
+Student verification may grant GitHub Pro benefits for private projects; the factory does not depend on that entitlement and does **not** build in private mode. Never upload confidential source into this public repository just to obtain free builds.
 
 ## GitHub Actions runner troubleshooting
 
