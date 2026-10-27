@@ -1,0 +1,152 @@
+name: APK Factory
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Android Gradle project or HTML/ZIP site'
+        type: choice
+        options: [native, web]
+        default: native
+        required: true
+      source:
+        description: 'Build from this repo or a public GitHub repo'
+        type: choice
+        options: [local, github]
+        default: local
+        required: true
+      repository:
+        description: 'Only for source=github: public owner/repo'
+        type: string
+        required: false
+      ref:
+        description: 'Only for source=github: branch or tag'
+        type: string
+        default: main
+        required: false
+      project_path:
+        description: 'For native: Gradle project directory'
+        type: string
+        default: projects/html-shelf
+        required: true
+      site_path:
+        description: 'For web: folder or ZIP containing index.html'
+        type: string
+        default: sites/demo
+        required: true
+      app_name:
+        description: 'For web: app display name'
+        type: string
+        default: My Web App
+        required: true
+      application_id:
+        description: 'For web: package name e.g. com.example.demo'
+        type: string
+        default: com.androidfactory.webapp
+        required: true
+      module:
+        description: 'For native: Gradle application module'
+        type: string
+        default: app
+        required: true
+      gradle_version:
+        description: 'Gradle version (use compatible one for your project)'
+        type: string
+        default: '8.9'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apk-factory-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout factory
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ inputs.gradle_version }}
+
+      - name: Stage selected project
+        env:
+          MODE: ${{ inputs.mode }}
+          SOURCE: ${{ inputs.source }}
+          SOURCE_REPO: ${{ inputs.repository }}
+          SOURCE_REF: ${{ inputs.ref }}
+          PROJECT_PATH: ${{ inputs.project_path }}
+          SITE_PATH: ${{ inputs.site_path }}
+          APP_NAME: ${{ inputs.app_name }}
+          APPLICATION_ID: ${{ inputs.application_id }}
+        run: |
+          python3 scripts/prepare.py \
+            --mode "$MODE" --source "$SOURCE" \
+            --repository "$SOURCE_REPO" --ref "$SOURCE_REF" \
+            --project-path "$PROJECT_PATH" --site-path "$SITE_PATH" \
+            --app-name "$APP_NAME" --application-id "$APPLICATION_ID"
+
+      - name: Run optional core tests
+        run: |
+          if [ -f .factory-work/project/tests/run.sh ]; then
+            bash .factory-work/project/tests/run.sh
+          fi
+
+      - name: Build debug APK
+        env:
+          MODULE: ${{ inputs.module }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          cd .factory-work/project
+          if [[ "$MODE" == "web" ]]; then
+            gradle --no-daemon --console=plain --stacktrace -PfactoryApplicationId="$(sed -n 's/^factoryApplicationId=//p' factory.properties)" :app:assembleDebug
+          else
+            if [[ ! "$MODULE" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]]; then
+              echo 'Invalid module name' >&2; exit 1
+            fi
+            gradle --no-daemon --console=plain --stacktrace ":${MODULE}:assembleDebug"
+          fi
+
+      - name: Gather APK and checksums
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          found=0
+          while IFS= read -r -d '' apk; do
+            rel="${apk#.factory-work/project/}"
+            module="${rel%%/*}"
+            name="${module}-$(basename "$apk")"
+            cp "$apk" "dist/$name"
+            found=$((found + 1))
+          done < <(find .factory-work/project -type f -path '*/build/outputs/apk/*' -name '*.apk' -print0)
+          if [ "$found" -eq 0 ]; then echo 'No APK generated' >&2; exit 1; fi
+          cd dist && sha256sum ./*.apk > SHA256SUMS.txt
+          ls -lah
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk-${{ github.run_number }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14

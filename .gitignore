@@ -1,0 +1,7 @@
+.factory-work/
+.gradle/
+**/build/
+**/.idea/
+local.properties
+*.apk
+.DS_Store
